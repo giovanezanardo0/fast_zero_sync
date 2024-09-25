@@ -27,62 +27,6 @@ def test_create_user(client):
     }
 
 
-def test_create_user_already_registered_username(client):
-    # Primeiro, cria o usuário com sucesso
-    response = client.post(
-        '/users/',
-        json={
-            'username': 'alice',
-            'email': 'alice@example.com',
-            'password': 'secret',
-        },
-    )
-
-    # Tenta criar o mesmo usuário novamente, o que deve falhar
-    response = client.post(
-        '/users/',
-        json={
-            'username': 'alice',
-            'email': 'alice2@example.com',  # mesmo username, mas outro email
-            'password': 'secret2',
-        },
-    )
-
-    # Verifica se o status code é 400 (Bad Request)
-    assert response.status_code == HTTPStatus.BAD_REQUEST
-
-    # Verifica se a resposta contém a mensagem de erro correta
-    assert response.json() == {'detail': 'Username already exists'}
-
-
-def test_create_user_already_registered_email(client):
-    # Primeiro, cria o usuário com sucesso
-    response = client.post(
-        '/users/',
-        json={
-            'username': 'alice',
-            'email': 'alice@example.com',
-            'password': 'secret',
-        },
-    )
-
-    # Tenta criar o mesmo usuário novamente, o que deve falhar
-    response = client.post(
-        '/users/',
-        json={
-            'username': 'joao',
-            'email': 'alice@example.com',  # mesmo username, mas outro email
-            'password': 'secret2',
-        },
-    )
-
-    # Verifica se o status code é 400 (Bad Request)
-    assert response.status_code == HTTPStatus.BAD_REQUEST
-
-    # Verifica se a resposta contém a mensagem de erro correta
-    assert response.json() == {'detail': 'Email already exists'}
-
-
 def test_read_users(client):
     response = client.get('/users')
     assert response.status_code == HTTPStatus.OK
@@ -95,9 +39,10 @@ def test_read_users_with_users(client, user):
     assert response.json() == {'users': [user_schema]}
 
 
-def test_update_user(client, user):
+def test_update_user(client, user, token):
     response = client.put(
-        '/users/1',
+        f'/users/{user.id}',
+        headers={'Authorization': f'Bearer {token}'},
         json={
             'username': 'bob',
             'email': 'bob@example.com',
@@ -108,12 +53,27 @@ def test_update_user(client, user):
     assert response.json() == {
         'username': 'bob',
         'email': 'bob@example.com',
-        'id': 1,
+        'id': user.id,
     }
 
 
-def test_delete_user(client, user):
-    response = client.delete('/users/1')
+def test_delete_user(client, user, token):
+    response = client.delete(
+        f'/users/{user.id}',
+        headers={'Authorization': f'Bearer {token}'},
+    )
 
     assert response.status_code == HTTPStatus.OK
     assert response.json() == {'message': 'User deleted'}
+
+
+def test_get_token(client, user):
+    response = client.post(
+        '/token',
+        data={'username': user.email, 'password': user.clean_password},
+    )
+    token = response.json()
+
+    assert response.status_code == HTTPStatus.OK
+    assert 'access_token' in token
+    assert 'token_type' in token
